@@ -1,0 +1,498 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Observability cookbook</title>
+    <link rel="stylesheet" href="dist/reset.css">
+    <link rel="stylesheet" href="dist/reveal.css">
+    <link rel="stylesheet" href="dist/theme/beige.css">
+    <!--    <link rel="stylesheet" href="dist/theme/black.css">-->
+    <!-- Theme used for syntax highlighted code -->
+    <link rel="stylesheet" href="plugin/highlight/monokai.css">
+    <link rel="stylesheet" href="css/reveal-override.css">
+    <style>
+        .container {
+            display: grid;
+            grid-auto-flow: column;
+        }
+    </style>
+</head>
+<body>
+<div class="reveal">
+    <div class="slides">
+        <section>
+            <h2>Observability cookbook:<br/> what for, and with what</h2>
+            <p>Michał Niczyporuk</p>
+            <p>@mihn</p>
+        </section>
+        <section>
+            <h2>About me</h2>
+            <ul>
+                <li>software samurai @ merXu</li>
+                <li>15 years of various experiences in the field</li>
+                <li>Warsaw JUG leader</li>
+            </ul>
+        </section>
+        <section>
+            <h2>Disclaimer</h2>
+            <p>This is not a deep dive</p>
+            <p class="fragment">This is an introduction</p>
+<!--            <p class="fragment">With one small tirade</p>-->
+        </section>
+        <section>
+            <h2>Agenda</h2>
+            <ul>
+                <li>What is observability?</li>
+                <li>Logs & centralized logs</li>
+                <li>Metrics</li>
+                <li>Tracing</li>
+<!--                <li>APM</li>-->
+                <li>Event</li>
+            </ul>
+        </section>
+        <section>
+            <section>
+                <h1>What is observability?</h1>
+            </section>
+            <section>
+                <h1>Observability</h1>
+                <p>aka O<span style="font-weight: bolder; color: red">bservabilit</span>y -> o11y</p>
+            </section>
+            <section>
+                <h2>The definition</h2>
+                <blockquote cite="https://en.wikipedia.org/wiki/Observability">
+                    &ldquo;In control theory, observability is a measure of how well internal states of a system
+                    can be inferred from knowledge of its external outputs&rdquo;
+                </blockquote>
+                <a href="https://en.wikipedia.org/wiki/Observability">Wikipedia</a>
+            </section>
+            <section>
+                <h2>Let's ask the oracle</h2>
+                <img src="images/o11y_chatgpt.png"/>
+            </section>
+            <section>
+                <h2>What for?</h2>
+                <p class="fragment">Way of determining state of the system</p>
+                <p class="fragment">Observe trends</p>
+                <p class="fragment">Spot anomalies</p>
+                <p class="fragment">Debug errors</p>
+                <p class="fragment">Gather data to support decision process</p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h1>Logging</h1>
+            </section>
+            <section>
+                <h2>Primer</h2>
+                <p>Don't use System.out.println()</p>
+                <p class="fragment">Pick logging library: <a href="https://logging.apache.org/log4j/2.x/">log4j</a> or <a
+                        href="https://logback.qos.ch/">logback</a></p>
+                <p class="fragment">Logging API: <a href="https://www.slf4j.org/">slf4j</a></p>
+            </section>
+            <section>
+                <h2>Define logger</h2>
+                <pre><code data-trim data-noescape>
+public class UserService {
+
+  private static final org.slf4j.Logger LOGGER =
+    org.slf4j.LoggerFactory.getLogger(UserService.class);
+
+  (...)
+}
+  </code></pre>
+            </section>
+            <section>
+                <h2>Use logger</h2>
+                <pre><code data-trim data-noescape>
+private void myMethod() {
+    LOGGER.info("running my great code");
+    doBusiness();
+    LOGGER.info("my great code finished");
+}
+  </code></pre>
+                <pre class="fragment"><code data-trim data-noescape class="nohighlight">
+2023-03-21 19:24:43,829 [main] INFO  UserService - running my great code
+2023-03-21 19:24:43,829 [main] INFO  UserService - my great code finished
+  </code></pre>
+            </section>
+            <section>
+                <h2>"Talking to a void" debugging</h2>
+                <pre><code data-trim data-noescape>
+private void myMethod() {
+    LOGGER.info("PLEASE WORK");
+    doBusiness();
+    LOGGER.info("SHOULD HAVE WORKED");
+}
+  </code></pre>
+            </section>
+            <section>
+                <h2>Dos</h2>
+                <img src="images/twitter_logs.png" class="r-stretch"/>
+                <!-- rozbic tweet na liste -->
+                <!-- poziomy logowania -->
+                <!-- <p class="fragment">Alerts based on logs are okay (in moderation)</p>
+                 <p class="fragment">Sending <strong>username</strong>/<strong>session ID</strong>/<strong>correlation
+                     ID</strong> to logs</p>-->
+            </section>
+            <section>
+                <h2>Don'ts</h2>
+                <ul>
+                    <li class="fragment">Logs can be lost</li>
+                    <li class="fragment">Logs are not metrics</li>
+                    <li class="fragment">Logs are not audit trail</li>
+                    <li class="fragment">Logs are not data warehouse/lake</li>
+                </ul>
+            </section>
+            <section>
+                <h2>What not to log</h2>
+                <p><a href="https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html#data-to-exclude">OWASP Logging Cheat sheet</a></p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h1>Centralized logs</h1>
+                <p>The diary</p>
+            </section>
+            <section>
+                <h2>Structure</h2>
+                <p>Unified structure across your system (e.g. JSON, logfmt)</p>
+                <p class="fragment">Do not try regexes if you value your time/sanity</p>
+            </section>
+            <section>
+                <h2>Central storage</h2>
+                <img src="images/elastic_logs.png" class="r-stretch"/>
+                <p>Software that can ingest, process and search the logs</p>
+            </section>
+            <section>
+                <h2>Publishing logs</h2>
+                <img src="images/logs_pull_push_2.png" class="r-stretch">
+               <!-- <ul>
+                    <li>Push - application pushes logs to centralized storage (more coupling)</li>
+                    <li>Pull - application logs to console/files - agent/sidecar parses them and pushes further (less
+                        coupling)
+                    </li>
+                </ul>-->
+            </section>
+            <section>
+                <h2>Growth rule of thumb</h2>
+                <p>More traffic = more logs</p>
+            </section>
+            <section>
+                <h2>Tooling</h2>
+                <p><a href="https://www.elastic.co/">Elastic Stack = ElasticSearch + Logstack + Kibana</a></p>
+                <p><a href="https://www.graylog.org/">Graylog</a></p>
+                <p><a href="https://grafana.com/oss/loki/">Grafana Loki</a></p>
+                <p>Whatever comes with your cloud provider</p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h1>Metrics</h1>
+                <p>The ledger*</p>
+            </section>
+            <section>
+                <p>Metrics are numbers, indexed in time order, across multiple dimensions</p>
+            </section>
+            <section>
+                <h2>Metrics and precision</h2>
+                <p class="fragment">Metrics are not precise</p>
+                <!-- metryki nie sa od pojedyńczych zdarzeń tylko je grupują -->
+                <p class="fragment" style="font-size: 72px">Metrics are not precise</p>
+            </section>
+            <section>
+                <h2>Metrics types</h2>
+            </section>
+            <section>
+                <h3>Counter</h3>
+                <div class="r-stack">
+                    <img class="fade-out" src="images/metric_counter.png" class="r-stretch">
+                    <img class="fragment" src="images/metric_counter_rate_help.png" class="r-stretch">
+                    <img class="fragment" src="images/metric_counter_rated.png" class="r-stretch">
+                </div>
+                <p>Used for: requests count, jobs completed, errors received</p>
+            </section>
+            <section>
+                <h3>Gauge</h3>
+                <img src="images/metric_gauge.png" class="r-stretch">
+                <p>Used for memory usage, thread/connection pools count, etc.</p>
+                <p>Tip: Store both current and maximum value, not the percentages</p>
+            </section>
+            <section>
+                <h3>Histogram</h3>
+                <div class="r-stack">
+                    <img class="fade-out" src="images/metric_histogram_ungrouped.png" class="r-stretch">
+                    <img class="fragment" src="images/metric_histogram_grouping_help.png" class="r-stretch">
+                    <img class="fragment" src="images/metric_histogram_grouped.png" class="r-stretch">
+                    <img class="fragment" src="images/metric_histogram_quantile.png" class="r-stretch">
+                </div>
+                <p>Typically used for request durations and sizes</p>
+                <p>Calculated on server - can calculate quantiles </p>
+            </section>
+            <section>
+                <h3>Summary</h3>
+                <p>Histogram - but with quantiles (e.g. 50%, 95%, 99%)</p>
+                <p>Request durations and sizes</p>
+                <p>Calculated client side - lighter then histograms</p>
+            </section>
+            <section>
+                <h2>What to measure?</h2>
+                <p>You have to know what you want to measure</p>
+                <p><a href="https://www.infoq.com/articles/the-box/">Kirk Pepperdine's The Box model</a></p>
+                <p class="fragment">Your framework/libraries cover some basics already</p>
+            </section>
+            <section>
+                <h2>Kirk Pepperdine's The Box</h2>
+                <p class="fragment">People: incoming requests, messages</p>
+                <p class="fragment">Application (Netty, Tomcat, Spring, etc.): thread pools, queue sizes,
+                    requests...</p>
+                <p class="fragment">Runtime metrics (JVM): GC, memory usage, threads...</p>
+                <p class="fragment">Hardware: CPU, memory, I/O, disk usage</p>
+            </section>
+            <section>
+                <h1>How to measure?</h1>
+            </section>
+            <section>
+                <h2>How to measure?</h2>
+                <div class="container">
+                    <div>
+                        <img src="images/sre_book.jpg"/>
+                    </div>
+                    <div>
+                        <p><a href="https://sre.google/sre-book/monitoring-distributed-systems/" target="_blank">The Four Golden Signals:</a></p>
+                        <ul>
+                            <li>Latency</li>
+                            <li>Traffic</li>
+                            <li>Errors</li>
+                            <li>Saturation</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <h2>Measurement methods</h2>
+                <p>RED vs USE</p>
+            </section>
+            <section>
+                <h2>RED</h2>
+                <ul>
+                    <li>Rate</li>
+                    <li>Error</li>
+                    <li>Duration</li>
+                </ul>
+                <p class="fragment">Application focused</p>
+            </section>
+            <section>
+                <h2>USE</h2>
+                <ul>
+                    <li>Utilization</li>
+                    <li>Saturation</li>
+                    <li>Errors</li>
+                </ul>
+                <p class="fragment">Infrastructure focused</p>
+            </section>
+            <section>
+                <h2>Metric attributes</h2>
+            </section>
+            <section>
+                <h2>Metric resolution</h2>
+                <p>How often metrics are probed</p>
+                <p>You don't need high resolution data in long term</p>
+                <p>Typical settings are: 15 seconds up to 7 days, 1 minute up to 30 days, and 1 hour up to 1
+                    year</p>
+                <p>YMMV</p>
+            </section>
+            <section>
+                <h2>Metric tags/labels</h2>
+                <p>Dimensions</p>
+                <p>Metadata:  HTTP attributes,  service name, Hosts, AWS regions,etc.</p>
+                <p>Metrics don't like high cardinality (a lot of unique values) labels</p>
+                <p class="fragment"><span style="color: green">route="/users/:id"</span> ✅</p>
+                <p class="fragment"><span style="color: red">route="/users/2137"</span> ❌</p>
+            </section>
+            <section>
+                <h2>Percentiles</h2>
+                <p>Use high percentiles (95%+), not averages/means (~50%)</p>
+                <p class="fragment"> 0.99 * 0.99 = 0.9801</p>
+                <p class="fragment"> 0.5 * 0.5 = 0.25</p>
+            </section>
+            <section>
+                <h2>Death by metrics</h2>
+                <p>Storing unnecessary amount of metrics</p>
+                <p class="fragment">Certainly bad for infrastructure and cloud bills</p>
+                <p class="fragment">Maybe bad for your mental health</p>
+            </section>
+            <section>
+                <h2>Growth rule of thumb</h2>
+                <p>More traffic = same amount of metrics</p>
+            </section>
+            <section>
+                <h2>Tools</h2>
+                <p><a href="https://prometheus.io">Prometheus</a> + <a href="https://grafana.com/">Grafana</a></p>
+                <p><a href="https://victoriametrics.com/">Victoria Metrics</a></p>
+                <p><a href="https://www.elastic.co/">Elastic Stack</a></p>
+                <p>Your cloud provider</p>
+                <p>Libraries: </p>
+                <p><a href="https://micrometer.io/">Micrometer - API abstraction</a></p>
+                <p><a href="https://opentracing.io/"
+                      style="text-decoration: line-through">OpenTracing</a> -> <a href="https://opencensus.io/"
+                      style="text-decoration: line-through">OpenCensus</a> -> <a href="https://opentelemetry.io/">OpenTelemetry</a></p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h1>Tracing</h1>
+            </section>
+<!--            <section>-->
+<!--                <h2>Traces</h2>-->
+<!--                <p>Show lifecycle of requests in system</p>-->
+<!--                <p>Trace contains spans</p>-->
+<!--                <p>Span - individual unit of work done: request, DB query, etc. </p>-->
+<!--                <p>Spans maybe contain extra metadata: request path, return code, etc.</p>-->
+<!--            </section>-->
+            <section>
+                <h2>Traces</h2>
+                <a href="https://micrometer.io/docs/tracing#_glossary"><img src="images/tracing_spans.jpg"
+                                                                            class="r-stretch"/></a>
+            </section>
+            <section>
+                <img src="images/zipkin_ui.png" class="r-stretch"/>
+            </section>
+            <section>
+                <h2>Do I really have to store traces for all requests?</h2>
+                <p class="fragment">You may not be able to store every single trace</p>
+                <p class="fragment">Sample your original dataset and save only every Nth trace</p>
+                <!-- tail based sampling -->
+            </section>
+            <section>
+                <h2>Growth rule of thumb</h2>
+                <p>More traffic = more traces</p>
+            </section>
+            <section>
+                <h2>Tools</h2>
+                <p>Abstraction API:</p>
+                <p><a href="https://opentelemetry.io/">OpenTelemetry</a></p>
+                <p><a href="https://micrometer.io/">Micrometer Tracing</a></p>
+                <p>Storage and visualization:</p>
+                <p><a href="https://zipkin.apache.org/">Zipkin</a></p>
+                <p><a href="https://www.jaegertracing.io/">Jaeger</a></p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h1>APM</h1>
+                <p>a rant</p>
+            </section>
+            <section>
+                <h2>Highlights</h2>
+                <p>Automatically instrument your application code</p>
+                <p>All in one solution</p>
+                <p>Figure out your architecture automatically</p>
+                <p>Many built-in features</p>
+            </section>
+            <section>
+                <h2>Problems that I've had</h2>
+                <p>APM that use reflection tend to affect performance and don't really work with nonblocking code</p>
+                <p>They like to take arbitrary decisions - like after 2 days metrics resolution changes to 1 hour</p>
+                <p>That fancy communication graphs tend to be useful only as sales pitch</p>
+            </section>
+            <section>
+                <h2>Caveat emptor</h2>
+            </section>
+            <section>
+                <h2>APM Tools</h2>
+                <h4>$$$</h4>
+                <p>New Relic, AppDynamics, Dynatrace, Splunk and many, many more</p>
+                <h4>Open source</h4>
+                <p>https://www.stagemonitor.org/</p>
+                <p>https://skywalking.apache.org/</p>
+                <p>and many more</p>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h2>Events</h2>
+                <p>"true" observability</p>
+            </section>
+            <section>
+                <h2>What are events?</h2>
+                <p>Events == traces</p>
+            </section>
+            <section>
+                <h2>So - what's the difference?</h2>
+                <p>Event are not the super power</p>
+                <p class="fragment">..the storage and query engine are</p>
+                <p class="fragment">and there's one problem with it</p>
+                <p class="fragment">there is only one provider (so far)</p>
+            </section>
+            <section>
+                <h2>New kid on the block</h2>
+                <p><img style="width: 200%" src="images/logo_honeycomb.svg"></p>
+            </section>
+            <section>
+                <img src="images/meme_za_darmo.png" class="r-stretch"/>
+                <p><a href="https://www.honeycomb.io/blog/avoid-paying-for-honeycomb" target="_blank">How to Avoid Paying for Honeycomb</a></p>
+            </section>
+            <section>
+                <h2>Inspiration</h2>
+                <a href="https://research.facebook.com/publications/scuba-diving-into-data-at-facebook/" class="r-stretch"><img src="images/facebook_scuba.png"/></a>
+            </section>
+            <section>
+                <h2>Heatmap</h2>
+                <img class="r-stretch" src="images/honeycomb2_1.png"/>
+            </section>
+            <section>
+                <h2>Bubble up</h2>
+                <img class="r-stretch" src="images/honeycomb2_2.png"/>
+            </section>
+            <section>
+                <h2>Dimensions</h2>
+                <img class="r-stretch" src="images/honeycomb2_3.png"/>
+            </section>
+            <section>
+                <h2>Dimensions</h2>
+                <img class="r-stretch" src="images/honeycomb2_4.png"/>
+            </section>
+            <section>
+                <h2>Filtered heatmap</h2>
+                <img class="r-stretch" src="images/honeycomb2_5.png"/>
+            </section>
+            <section>
+                <h2>Culprit trace</h2>
+                <img class="r-stretch" src="images/honeycomb2_6.png"/>
+            </section>
+            <section>
+                <h2>The Bug</h2>
+                <img class="r-stretch" src="images/honeycomb2_7.png"/>
+            </section>
+            <section>
+                <h2>Deployment</h2>
+                <img class="r-stretch" src="images/honeycomb2_8.png"/>
+            </section>
+        </section>
+        <section>
+            <h1>Thank you!</h1>
+            <h2>Questions?</h2>
+        </section>
+    </div>
+</div>
+
+<script src="dist/reveal.js"></script>
+<script src="plugin/notes/notes.js"></script>
+<script src="plugin/markdown/markdown.js"></script>
+<script src="plugin/highlight/highlight.js"></script>
+<script>
+    // More info about initialization & config:
+    // - https://revealjs.com/initialization/
+    // - https://revealjs.com/config/
+    Reveal.initialize({
+        hash: true,
+        showSlideNumber: 'speaker',
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+        pdfSeparateFragments: false
+    });
+</script>
+</body>
+</html>
